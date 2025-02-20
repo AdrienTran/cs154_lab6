@@ -17,9 +17,41 @@ update_branch_taken = pyrtl.Input(bitwidth=1, name='update_branch_taken') # whet
 # Outputs
 pred_taken = pyrtl.Output(bitwidth=1, name='pred_taken')
 
-pred_state = pyrtl.MemBlock(...
+pred_state = pyrtl.MemBlock(bitwidth=2, addrwidth=3, name='pred_state')
+
+new_pred_state = pyrtl.WireVector(bitwidth=2, name="new_pred_state")
 
 # Write your BHT branch predictor here
+fetch_index = fetch_pc[2:5]
+prev_fetch_index = update_branch_pc[2:5]
+
+branch_pred_state = pred_state[prev_fetch_index]
+
+with pyrtl.conditional_assignment:
+    with update_prediction:
+        with update_branch_taken:
+            with branch_pred_state == 3:
+                new_pred_state |= 3
+            with pyrtl.otherwise:
+                new_pred_state |= branch_pred_state + 1
+        with pyrtl.otherwise:
+            with branch_pred_state == 0:
+                new_pred_state |= 0
+            with pyrtl.otherwise:
+                new_pred_state |= branch_pred_state - 1
+    with pyrtl.otherwise:
+        new_pred_state |= branch_pred_state
+
+# pred_state[fetch_index] <<= new_pred_state
+with pyrtl.conditional_assignment:
+    with fetch_index == prev_fetch_index:
+        # print("test")
+        pred_taken |= new_pred_state[1]
+    with pyrtl.otherwise:
+        # print("test123")
+        pred_taken |= pred_state[fetch_index][1]
+
+pred_state[prev_fetch_index] <<= new_pred_state
 
 #Testing
 if __name__ == "__main__":
@@ -45,9 +77,11 @@ if __name__ == "__main__":
         })
 
         predictionCurrent = sim_trace.trace['pred_taken'][-1] # get the value of your prediction
-
+        # print(iteration + 1, " : ",  predictionPrevious)
         if isBranchPrevious: # check if previous instr was a branch
             if predictionPrevious == branchTakenPrevious: # if prediction was correct
+                # print (iteration, ": ", predictionPrevious, " ", branchTakenPrevious, " ", pcCurrent)
+                # print ("curr: ", predictionCurrent, " ", branchTakenCurrent)
                 correct += 1
             count += 1
 
@@ -63,6 +97,9 @@ if __name__ == "__main__":
         if predictionPrevious == branchTakenPrevious:
             correct += 1 # Correct prediction
         count += 1
-
+        
+    # print("correct: ", correct)
+    # print("count: ", count)
+    
     print("Accuracy = ", correct/count)
     sim_trace.render_trace()

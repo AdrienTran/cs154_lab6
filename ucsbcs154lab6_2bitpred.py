@@ -17,11 +17,28 @@ update_branch_taken = pyrtl.Input(bitwidth=1, name='update_branch_taken') # whet
 # Outputs
 pred_taken = pyrtl.Output(bitwidth=1, name='pred_taken')
 
-pred_state = pyrtl.Register(...
+pred_state = pyrtl.Register(bitwidth=2, name="pred_state")
+new_pred_state = pyrtl.WireVector(bitwidth=2, name="new_pred_state")
 
 # Implement your branch predictor here!
+pred_taken <<= pred_state[1]
 
+pred_state.next <<= new_pred_state
 
+with pyrtl.conditional_assignment:
+    with update_prediction:
+        with update_branch_taken:
+            with pred_state == 3:
+                new_pred_state |= pred_state
+            with pyrtl.otherwise:
+                new_pred_state |= pred_state + 1
+        with pyrtl.otherwise:
+            with pred_state == 0:
+                new_pred_state |= pred_state
+            with pyrtl.otherwise:
+                new_pred_state |= pred_state - 1
+    with pyrtl.otherwise:
+        new_pred_state |= pred_state
 
 
 # Testing
